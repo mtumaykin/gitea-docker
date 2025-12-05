@@ -1,46 +1,73 @@
-.
-├── ansible
-│   ├── ansible.cfg
-│   ├── hosts
-│   ├── playbooks
-│   │   ├── all.yaml
-│   │   ├── base.yaml
-│   │   └── gitea.yaml
-│   └── roles
-│       ├── base
-│       │   ├── defaults
-│       │   │   └── main.yml
-│       │   ├── files
-│       │   ├── handlers
-│       │   │   └── main.yml
-│       │   ├── meta
-│       │   │   └── main.yml
-│       │   ├── tasks
-│       │   │   ├── base_install.yml
-│       │   │   └── main.yml
-│       │   └── vars
-│       │       └── main.yml
-│       └── gitea
-│           ├── defaults
-│           │   └── main.yml
-│           ├── files
-│           │   └── Dockerfile
-│           ├── handlers
-│           │   └── main.yml
-│           ├── meta
-│           │   └── main.yml
-│           ├── tasks
-│           │   ├── gitea_install.yml
-│           │   └── main.yml
-│           ├── templates
-│           │   ├── docker.sources.j2
-│           │   └── gitea.conf.j2
-│           └── vars
-│               └── main.yml
-├── Dockerfile
-├── README.md
-└── ssh
-    ├── id_ed25519
-    └── id_ed25519.pub
+<pre> Структура репозитория
+ansible/
+├── ansible.cfg -- Конфигурация ansible
+├── hosts -- Инвентарные записи
+├── playbooks/ 
+│   ├── all.yaml -- Запуск плейбука для всех ролей
+│   ├── base.yaml -- Установка только базовых зависимостей
+│   └── gitea.yaml -- Установка Docker и Gitea
+└── roles/
+    ├── base/ -- Базовая роль для установки необходимых пакетов
+    │   ├── defaults/main.yml
+    │   ├── files/
+    │   ├── handlers/main.yml
+    │   ├── meta/main.yml
+    │   ├── tasks/
+    │   │   ├── base_install.yml
+    │   │   └── main.yml
+    │   └── vars/main.yml
+    └── gitea/ -- Роль для установки Docker и Gitea на хост
+        ├── defaults/main.yml
+        ├── files/Dockerfile
+        ├── handlers/main.yml
+        ├── meta/main.yml
+        ├── tasks/
+        │   ├── gitea_install.yml
+        │   └── main.yml
+        ├── templates/
+        │   ├── docker.sources.j2
+        │   └── gitea.conf.j2
+        └── vars/main.yml
+Dockerfile -- Файл для сборки образа контейнера с Ansible
+ssh/ -- Тестовые ssh ключи для работы ansible
+├── id_ed25519
+└── id_ed25519.pub </pre>
 
-19 directories, 24 files
+Для работы проекта необходимо внести публичный ключ на хост в /{user}/.ssh/authorized_keys
+Проект написан для работы с портом ssh 2022 для соединения с хостом. Данная связка работает напрямую по указанным портам 80 для веб-интерфейса и 22 для ssh. При необходимости запросов по доменному имени можнно настроить проксирование через nginx.
+Суть работы:
+  В файл hosts вписывается выбранный хост на Debian 13 на который необходимо провести раскатку. Пример:
+    [gitea]
+    gitea.local ansible_host=192.168.3.213 ansible_port=2022
+    (доменное имя)   (адрес хоста)           (ssh порт)
+  Далее необходимо собрать образ контейнера с Ansible на Debian 13 и за. Необходимый Dockerfile находится в корне репозитория:
+    docker build . -t "{image-name}"
+  Для проверки связности контейнера с хостами можно воспользоваться командой:
+    docker run -it --rm {image-name} ansible gitea -m ping
+    или для отдельного хоста
+    docker run -it --rm {image-name} ansible {hostname} -m ping
+  При подтверждении работоспособности связи с хостами можно приступать к прокатке плейбуками. Для прокатки всех заданий для каждого хоста используется команда:
+    docker run -it --rm {image-name} ansible-playbooks playbooks/all.yaml (опционально --dry-run для проверки изменений без применения)
+    или для каждой роли отдельно
+    docker run -it --rm {image-name} ansible-playbooks playbooks/base.yaml (опционально --dry-run для проверки изменений без применения)
+    docker run -it --rm {image-name} ansible-playbooks playbooks/gitea.yaml (опционально --dry-run для проверки изменений без применения)
+  Роль base в данном случае выполняет установку необходимых пакетов от которых зависит выполнение других ролей и вынесена отдельно для всеобщей прокатки. Устанавливает следующие пакеты:
+    - ca-certificates
+    - curl
+    - gnupg
+    - lsb-release
+    - mc
+    - rsync
+    - tar
+    - unzip
+    - wget
+    - zip
+  Роль gitea предназачена для подготовки хоста к установке Gitea в Docker контейнере. Основные задачи при прокатке:
+    - Проверка необходимых каталогов и создание в случае отсутствия
+    - Загрузка Dockerfile Gitea на хост в отдельный каталог
+    - Добавление необходимых файлов ключей и репозиториев Docker для установки необходимых пакетов
+    - Установка Docker и связанных с ним пакетов из официального репозитория
+    - Сборка образа контейнера Gitea из загруженного Dockerfile
+    - Создание отдельной докер сети для Gitea
+    - Запуск контейнера gitea с настроенными портами 80 и 22
+  Проверить работу контейнера можно обратившись к хосту по доменному имени или IP-адресу. Если прокатка прошла без ошибок, то отобразится страница первичной настройки Gitea. Для проверки работы клонирования репозиториев можно создать тестового пользователя, создать под ним тестовый репозиторий и выполнить git clone git@{address}:{user}/{repo}.git

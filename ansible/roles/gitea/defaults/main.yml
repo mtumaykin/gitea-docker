@@ -1,0 +1,15 @@
+---
+docker_version: "stable"
+docker_edition: "ce"
+docker_install_compose: true
+docker_users: []
+
+docker_repo_url: "https://download.docker.com/linux/debian"
+docker_gpg_url: "https://download.docker.com/linux/debian/gpg"
+
+docker_packages:
+  - "docker-{{ docker_edition }}"
+  - "docker-{{ docker_edition }}-cli"
+  - "containerd.io"
+  - "docker-buildx-plugin"
+  - "docker-compose-plugin"

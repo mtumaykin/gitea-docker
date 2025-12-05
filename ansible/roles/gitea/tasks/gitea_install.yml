@@ -1,0 +1,98 @@
+- name: Check docker directories
+  stat:
+    path: /opt/gitea-docker
+  register: dir_stat
+
+- name: Create docker dir
+  file:
+    path: /opt/gitea-docker
+    state: directory
+  when: not dir_stat.stat.exists
+
+- name: Sync docker files
+  ansible.builtin.copy:
+    src: files/Dockerfile
+    dest: /opt/gitea-docker/Dockerfile
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Docker installation enable
+  ansible.builtin.set_fact:
+    docker_install_enabled: true
+  when: ansible_os_family == "Debian"
+
+- name: GPG-keys directory creation
+  ansible.builtin.file:
+    path: "{{ docker_gpg_dir }}"
+    state: directory
+    mode: '0755'
+  when: docker_install_enabled
+
+- name: Dockr GPG addition
+  ansible.builtin.get_url:
+    url: "{{ docker_gpg_url }}"
+    dest: "{{ docker_gpg_path }}"
+    mode: '0644'
+    force: yes
+  when: docker_install_enabled
+  notify: update apt cache
+
+- name: Docker repo addition
+  ansible.builtin.template:
+    src: docker.sources.j2
+    dest: "{{ docker_sources_path }}"
+    mode: '0644'
+  when: docker_install_enabled
+  notify: update apt cache
+
+- name: Install packages
+  package:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: true
+
+- name: Add user to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: yes
+  loop: "{{ docker_users }}"
+  when: 
+    - docker_install_enabled
+    - docker_users | length > 0
+
+- name: Build Gitea Docker image
+  docker_image:
+    name: gitea/gitea-1.25
+    source: build
+    build:
+      path: /opt/gitea-docker
+      dockerfile: Dockerfile
+    state: present
+
+- name: Create Docker network for Gitea
+  docker_network:
+    name: gitea-network
+    state: present
+
+- name: Run gitea container
+  docker_container:
+    name: gitea-test
+    image: gitea/gitea-1.25
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: gitea-network
+    ports:
+      - "80:3000"
+      - "22:22"
+    volumes:
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+    env:
+      USER_UID: "1000"
+      USER_GIT: "1000"
+      GITEA__server__DOMAIN: "{{ inventory_hostname }}"
+      GITEA__server__SSH_DOMAIN: "{{ inventory_hostname }}"
+      GITEA__server__SSH_PORT: "22"

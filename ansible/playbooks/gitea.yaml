@@ -1,0 +1,8 @@
+---
+- name: Gitea installation
+  hosts: gitea
+  gather_facts: true
+  become: yes
+
+  roles:
+    - gitea

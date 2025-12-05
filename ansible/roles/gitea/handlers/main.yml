@@ -1,0 +1,11 @@
+---
+- name: update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: restart docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+    enabled: yes

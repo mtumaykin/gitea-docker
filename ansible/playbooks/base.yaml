@@ -1,0 +1,8 @@
+---
+- name: Base utils installation
+  hosts: gitea
+  gather_facts: true
+  become: yes
+
+  roles:
+    - base

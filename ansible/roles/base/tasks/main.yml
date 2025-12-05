@@ -1,0 +1,2 @@
+- name: Install base packages
+  include_tasks: base_install.yml

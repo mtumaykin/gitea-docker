@@ -1,0 +1,16 @@
+- name: Install base packages
+  package:
+    name:
+      - mc
+      - zip
+      - unzip
+      - rsync
+      - wget
+      - tar
+      - curl
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - nginx
+    state: present
+    update_cache: true

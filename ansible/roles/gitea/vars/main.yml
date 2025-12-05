@@ -1,0 +1,4 @@
+---
+docker_gpg_dir: "/etc/apt/keyrings"
+docker_gpg_path: "{{ docker_gpg_dir }}/docker.asc"
+docker_sources_path: "/etc/apt/sources.list.d/docker.sources"
